@@ -1,9 +1,12 @@
+
+
 // src/main.rs
 use image::{GenericImageView, ImageReader};
 use std::fs;
 use std::io;
 use std::process::Command;
 use std::path::Path;
+use std::thread;
 
 struct AsciiConverter {
     width: u32,
@@ -172,7 +175,10 @@ impl KindlePlayer {
             println!("\n✅ ASCII conversion complete!");
         }
         
-        // Play animation
+        // Clear screen once at the very start, then let frames overlay
+        self.clear_screen()?;
+        
+        // Play animation with ghosting effect
         for loop_num in 0..loops {
             if loops > 1 {
                 println!("🔄 Loop {} of {}", loop_num + 1, loops);
@@ -199,11 +205,10 @@ impl KindlePlayer {
                     }
                 };
                 
-                // Display frame
-                self.clear_screen()?;
+                // Display frame directly - no clearing for ghosting effect
                 self.display_ascii(ascii_content)?;
                 
-                // E-ink timing control - slow down for better display
+                // E-ink timing control
                 std::thread::sleep(std::time::Duration::from_millis(200));
             }
         }
@@ -222,12 +227,15 @@ impl KindlePlayer {
         
         println!("🎬 Frame-by-frame mode (press Enter for next frame, 'q' to quit)");
         
+        // Clear once at start
+        self.clear_screen()?;
+        
         for (i, frame_file) in frame_files.iter().enumerate() {
             println!("Frame {} of {}: {}", i + 1, frame_files.len(), frame_file);
             
             match self.converter.image_to_ascii(frame_file) {
                 Ok(ascii_content) => {
-                    self.clear_screen()?;
+                    // No clearing between frames - overlay for ghosting effect
                     self.display_ascii(&ascii_content)?;
                 },
                 Err(e) => {
@@ -256,9 +264,9 @@ fn main() -> io::Result<()> {
     
     if args.len() < 2 {
         println!("Usage:");
-        println!("  {} <image_directory> [loops]     - Convert and play video", args[0]);
-        println!("  {} <image_directory> step        - Frame-by-frame mode", args[0]);
-        println!("  {} <image_directory> save [loops] - Pre-convert all frames", args[0]);
+        println!("  {} <image_directory> [loops]        - Convert and play video", args[0]);
+        println!("  {} <image_directory> step           - Frame-by-frame mode", args[0]);
+        println!("  {} <image_directory> save [loops]   - Pre-convert all frames", args[0]);
         return Ok(());
     }
     
@@ -282,15 +290,15 @@ fn main() -> io::Result<()> {
                 } else {
                     1
                 };
-                player.convert_and_play(image_dir, loops, true)?;
+                player.convert_and_play(image_dir, loops, true)?; // save=true
             },
             _ => {
                 let loops = args[2].parse().unwrap_or(1);
-                player.convert_and_play(image_dir, loops, false)?;
+                player.convert_and_play(image_dir, loops, false)?; // save=false
             }
         }
     } else {
-        player.convert_and_play(image_dir, 1, false)?;
+        player.convert_and_play(image_dir, 1, false)?; // save=false
     }
     
     Ok(())
