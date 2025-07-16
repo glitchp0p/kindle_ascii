@@ -1,12 +1,9 @@
-
-
 // src/main.rs
 use image::{GenericImageView, ImageReader};
 use std::fs;
 use std::io;
 use std::process::Command;
 use std::path::Path;
-use std::thread;
 
 struct AsciiConverter {
     width: u32,
@@ -75,8 +72,8 @@ struct KindlePlayer {
 
 impl KindlePlayer {
     fn new() -> Self {
-        // Kindle-optimized dimensions: 60 wide x 80 tall
-        let converter = AsciiConverter::new(60, 80);
+        // Kindle-optimized dimensions: 60 wide x 44 tall (using full screen height)
+        let converter = AsciiConverter::new(60, 44);
         
         KindlePlayer { converter }
     }
@@ -92,7 +89,7 @@ impl KindlePlayer {
         let lines: Vec<&str> = ascii_content.lines().collect();
         
         for (line_num, line) in lines.iter().enumerate() {
-            if line_num >= 24 { // eips screen height limit
+            if line_num >= 44 { // Use full Kindle screen height
                 break;
             }
             
@@ -105,8 +102,8 @@ impl KindlePlayer {
             
             for (chunk_idx, chunk) in chunks.iter().enumerate() {
                 if !chunk.trim().is_empty() {
-                    let display_line = line_num + (chunk_idx * 24); // Stack chunks vertically
-                    if display_line < 24 {
+                    let display_line = line_num + (chunk_idx * 44); // Stack chunks vertically
+                    if display_line < 44 {
                         Command::new("eips")
                             .arg("0")
                             .arg(display_line.to_string())
@@ -208,8 +205,7 @@ impl KindlePlayer {
                 // Display frame directly - no clearing for ghosting effect
                 self.display_ascii(ascii_content)?;
                 
-                // E-ink timing control
-                std::thread::sleep(std::time::Duration::from_millis(200));
+                // No delay - maximum speed rendering!
             }
         }
         
