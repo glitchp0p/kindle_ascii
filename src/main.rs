@@ -15,7 +15,16 @@ impl AsciiConverter {
     fn new(width: u32, height: u32) -> Self {
         // ASCII characters from dark to light - using only Kindle-confirmed characters
         // Removed "#" and other unavailable chars, using only tested ones
-        let chars = vec![' ', '.', ':', '-', '=', '+', '*', '@'];
+    let chars = vec![
+        '.', ',', '-', '_', ':', '=', '+', 'i', 'l', '1', 
+        't', 'f', 'j', 'r', 'c', '*', '?', 'v', 'n', 'u', 
+        'e', 'o', 'a', 'y', 'x', 'z', 's', '7', '3', '2', 
+        '5', 'L', 'T', 'J', 'F', 'C', 'I', 'Y', 'Z', 'E', 
+        'S', 'P', '6', '9', '4', 'h', 'k', 'd', 'q', 'w', 
+        '[', ']', 'V', 'p', 'G', 'b', 'A', 'K', 'X', 'H', 
+        'U', '8', '0', 'O', 'R', 'D', 'B', 'g', 'm', 'M', 
+        'N', 'W', 'Q', '@'
+    ];
         
         AsciiConverter {
             width,
@@ -23,7 +32,15 @@ impl AsciiConverter {
             chars,
         }
     }
-    
+   
+    fn enhance_contrast(gray: u8, contrast: f32) -> u8 {
+        let normalized = gray as f32 / 255.0;
+        let enhanced = ((normalized - 0.5) * contrast + 0.5).clamp(0.0, 1.0);
+        (enhanced * 255.0) as u8
+    }
+
+
+
     fn image_to_ascii(&self, image_path: &str) -> io::Result<String> {
         // Load and process image
         let img = match ImageReader::open(image_path) {
@@ -50,11 +67,16 @@ impl AsciiConverter {
             for x in 0..self.width {
                 let pixel = resized.get_pixel(x, y);
                 
-                // Convert to grayscale (simple average)
-                let gray = ((pixel[0] as u32 + pixel[1] as u32 + pixel[2] as u32) / 3) as u8;
-                
-                // Map grayscale to ASCII character
-                let char_index = (gray as usize * (self.chars.len() - 1)) / 255;
+             // Better grayscale conversion using luminance
+                let gray = (0.299 * pixel[0] as f32 + 
+                       0.587 * pixel[1] as f32 + 
+                       0.114 * pixel[2] as f32) as u8;   
+
+                // Apply contrast enhancement for better ASCII mapping
+                let enhanced_gray = Self::enhance_contrast(gray, 1.2); // Adjust contrast factor as needed 
+
+            // Map grayscale to ASCII character
+                let char_index = (enhanced_gray as usize * (self.chars.len() - 1)) / 255;
                 let char_index = char_index.min(self.chars.len() - 1);
                 
                 ascii_output.push(self.chars[char_index]);
@@ -72,8 +94,8 @@ struct KindlePlayer {
 
 impl KindlePlayer {
     fn new() -> Self {
-        // Kindle-optimized dimensions: 60 wide x 44 tall (using full screen height)
-        let converter = AsciiConverter::new(60, 44);
+        // Kindle-optimized dimensions: 60 wide x 39 high (using full screen height)
+        let converter = AsciiConverter::new(50, 40);
         
         KindlePlayer { converter }
     }
@@ -85,38 +107,33 @@ impl KindlePlayer {
         Ok(())
     }
     
-    fn display_ascii(&self, ascii_content: &str) -> io::Result<()> {
-        let lines: Vec<&str> = ascii_content.lines().collect();
-        
-        for (line_num, line) in lines.iter().enumerate() {
-            if line_num >= 44 { // Use full Kindle screen height
-                break;
-            }
-            
-            // Split long lines to fit screen width if needed
-            let chunks: Vec<String> = line.chars()
-                .collect::<Vec<char>>()
-                .chunks(50) // eips width limit
-                .map(|chunk| chunk.iter().collect())
-                .collect();
-            
-            for (chunk_idx, chunk) in chunks.iter().enumerate() {
-                if !chunk.trim().is_empty() {
-                    let display_line = line_num + (chunk_idx * 44); // Stack chunks vertically
-                    if display_line < 44 {
-                        Command::new("eips")
-                            .arg("0")
-                            .arg(display_line.to_string())
-                            .arg(chunk)
-                            .status()?;
-                    }
-                }
-            }
+     fn display_ascii(&self, ascii_content: &str) -> io::Result<()> {
+    let lines: Vec<&str> = ascii_content.lines().collect();
+    
+    for (line_num, line) in lines.iter().enumerate() {
+        if line_num >= 39 { // Correct height limit
+            break;
         }
         
-        Ok(())
+        // Ensure line is exactly 60 chars (truncate if longer)
+        let display_line = if line.len() > 60 {
+            &line[..60]
+        } else {
+            line
+        };
+        
+        if !display_line.trim().is_empty() {
+            Command::new("eips")
+                .arg("0")
+                .arg(line_num.to_string())
+                .arg(display_line)
+                .status()?;
+        }
     }
     
+    Ok(())
+}
+
     fn find_frame_files(&self, directory: &str) -> io::Result<Vec<String>> {
         let mut frame_files = Vec::new();
         
@@ -252,6 +269,7 @@ impl KindlePlayer {
         Ok(())
     }
 }
+
 
 fn main() -> io::Result<()> {
     println!("🎭 Kindle ASCII Video Player");
