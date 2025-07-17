@@ -111,13 +111,13 @@ impl KindlePlayer {
     let lines: Vec<&str> = ascii_content.lines().collect();
     
     for (line_num, line) in lines.iter().enumerate() {
-        if line_num >= 39 { // Correct height limit
+        if line_num >= 40 { // Correct height limit
             break;
         }
         
         // Ensure line is exactly 60 chars (truncate if longer)
-        let display_line = if line.len() > 60 {
-            &line[..60]
+        let display_line = if line.len() > 50 {
+            &line[..50]
         } else {
             line
         };
