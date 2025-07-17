@@ -106,33 +106,40 @@ impl KindlePlayer {
             .status()?;
         Ok(())
     }
-    
-     fn display_ascii(&self, ascii_content: &str) -> io::Result<()> {
-    let lines: Vec<&str> = ascii_content.lines().collect();
-    
-    for (line_num, line) in lines.iter().enumerate() {
-        if line_num >= 40 { // Correct height limit
-            break;
+   
+    fn display_ascii(&self, ascii_content: &str, previous_frame: Option<&str>) -> io::Result<()> {
+        let lines: Vec<&str> = ascii_content.lines().collect();
+        let prev_lines: Vec<&str> = previous_frame
+            .map(|p| p.lines().collect())
+            .unwrap_or_else(Vec::new);
+        
+        for (line_num, line) in lines.iter().enumerate() {
+            if line_num >= 40 {
+                break;
+            }
+            
+            // Skip if line is identical to previous frame
+            if line_num < prev_lines.len() && prev_lines[line_num] == *line {
+                continue;
+            }
+            
+            let display_line = if line.len() > 60 {
+                &line[..60]
+            } else {
+                line
+            };
+            
+            if !display_line.trim().is_empty() {
+                Command::new("eips")
+                    .arg("0")
+                    .arg(line_num.to_string())
+                    .arg(display_line)
+                    .status()?;
+            }
         }
         
-        // Ensure line is exactly 60 chars (truncate if longer)
-        let display_line = if line.len() > 50 {
-            &line[..50]
-        } else {
-            line
-        };
-        
-        if !display_line.trim().is_empty() {
-            Command::new("eips")
-                .arg("0")
-                .arg(line_num.to_string())
-                .arg(display_line)
-                .status()?;
-        }
+        Ok(())
     }
-    
-    Ok(())
-}
 
     fn find_frame_files(&self, directory: &str) -> io::Result<Vec<String>> {
         let mut frame_files = Vec::new();
@@ -197,6 +204,8 @@ impl KindlePlayer {
             if loops > 1 {
                 println!("🔄 Loop {} of {}", loop_num + 1, loops);
             }
+
+            let mut previous_frame: Option<String> = None;
             
             for (i, frame_file) in frame_files.iter().enumerate() {
                 print!("\rPlaying frame {} of {}...", i + 1, frame_files.len());
@@ -220,9 +229,11 @@ impl KindlePlayer {
                 };
                 
                 // Display frame directly - no clearing for ghosting effect
-                self.display_ascii(ascii_content)?;
+                self.display_ascii(ascii_content, previous_frame.as_deref())?;
                 
-                // No delay - maximum speed rendering!
+
+                // Store current frame as previous for next iteration
+                previous_frame = Some(ascii_content.to_string());
             }
         }
         
@@ -249,7 +260,7 @@ impl KindlePlayer {
             match self.converter.image_to_ascii(frame_file) {
                 Ok(ascii_content) => {
                     // No clearing between frames - overlay for ghosting effect
-                    self.display_ascii(&ascii_content)?;
+                    self.display_ascii(&ascii_content, None)?;
                 },
                 Err(e) => {
                     eprintln!("Error converting {}: {}", frame_file, e);
