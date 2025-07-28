@@ -1,58 +1,53 @@
 #!/bin/sh
-# animation_manager.sh - Cycles through multiple animations
+# animation_manager.sh - Runs for set time then exits
 
-# List of available animations
+# Animation timeout (in seconds) - adjust as needed
+TIMEOUT=300  # 5 minutes
+
+# Record start time
+START_TIME=$(date +%s)
+
+echo "Animation started, will run for ${TIMEOUT} seconds"
+
+# List of animations
 ANIMATIONS="
 /var/local/hacks/videos/rude_dance
 /var/local/hacks/videos/em_dance
 "
 
-# Track which animation to play next
-COUNTER_FILE="/tmp/animation_counter"
-
-# Initialize counter if it doesn't exist
-if [ ! -f "$COUNTER_FILE" ]; then
-    echo "0" > "$COUNTER_FILE"
+# Get counter
+CNT_FILE="/tmp/anim_cnt"
+if [ -f "$CNT_FILE" ]; then
+    CNT=$(cat "$CNT_FILE")
+else
+    CNT=0
 fi
 
-# Read current counter
-COUNTER=$(cat "$COUNTER_FILE")
-
-# Convert animations list to array
-ANIM_ARRAY=""
-for anim in $ANIMATIONS; do
-    ANIM_ARRAY="$ANIM_ARRAY $anim"
-done
-
-# Count total animations
-TOTAL=0
-for anim in $ANIM_ARRAY; do
-    TOTAL=$((TOTAL + 1))
-done
-
-# Select animation based on counter
-CURRENT=0
-SELECTED=""
-for anim in $ANIM_ARRAY; do
-    if [ $CURRENT -eq $COUNTER ]; then
-        SELECTED="$anim"
-        break
-    fi
-    CURRENT=$((CURRENT + 1))
-done
-
-# Increment counter for next time (wrap around)
-NEXT_COUNTER=$((COUNTER + 1))
-if [ $NEXT_COUNTER -ge $TOTAL ]; then
-    NEXT_COUNTER=0
+# Select animation (0=rude_dance, 1=em_dance)
+if [ "$CNT" = "0" ]; then
+    SELECTED="/var/local/hacks/videos/rude_dance"
+    echo "1" > "$CNT_FILE"
+else
+    SELECTED="/var/local/hacks/videos/em_dance"  
+    echo "0" > "$CNT_FILE"
 fi
-echo "$NEXT_COUNTER" > "$COUNTER_FILE"
 
-echo "Playing animation: $(basename "$SELECTED")" >> /tmp/watchdog_debug.log
+echo "Playing: $(basename "$SELECTED")"
 
-# Change to binary directory and run the selected animation
+# Run animation with timeout check
 cd /var/local/hacks/bin/
 while true; do
+    # Check if we've exceeded timeout
+    CURRENT_TIME=$(date +%s)
+    ELAPSED=$((CURRENT_TIME - START_TIME))
+    
+    if [ $ELAPSED -ge $TIMEOUT ]; then
+        echo "Animation timeout reached (${ELAPSED}s), exiting"
+        break
+    fi
+    
     ./kindle_ascii "$SELECTED" 1
     sleep 0.5
 done
+
+echo "Animation manager exiting cleanly"
