@@ -12,4 +12,5 @@ Producing slow animations from ripped videos
 ### ...TODO: 
 
 *outline ripping protocol*
+*pull final robust installation code from kindle*
 
